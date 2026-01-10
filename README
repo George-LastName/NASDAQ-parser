@@ -1,0 +1,34 @@
+Market Data Handler
+
+Goals:
+Overall: Use historical NASDAQ ITCH data to help simulate reviceing market data.
+1) Get sample data.
+-> Done : Using data from 30/01/2019 from https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/
+2) Read and Send data.
+    2.1) Reading. Use mmap and create a simple checker. Use message type to infer the length and check the timestamp to see if it should be sent.
+
+    For the simulation I think I'll want the ability to control the speed of messages for debugging and maybe for visuals if I decide to implement a GUI. So only send a message if the timestamp is >= the simulation time.
+
+    2.2) Sending. NASDAQ uses a version of UPD when sending data for create a UPD host to send the messages when a message is ready.
+
+3) Recieve data. Make a client that is able to listen to UPD and revice the binary messages
+4) Decode message.
+5) Handle the stock messages for a single symbol.
+6) Implement GUI to show messages and price / other things for single stock.
+7) ?hanlde multiple (all?) stocks
+8) Step 6 but for all stocks
+
+
+
+
+
+
+
+LLM generated milestones
+1 Small parser that reads file and emits messages to stdout.
+2 Simple replay server (max-speed + real-time) sending over chosen transport.
+3 Minimal consumer that receives raw messages and prints decoded events.
+4 Single-symbol orderbook module that consumes events and validates state.
+5 Add persistence (raw journal + decoded events).
+6 Add simulated order gateway and test round-trip orders vs. reconstructed book.
+7 Scale tests, inject faults/latency, and profile.
