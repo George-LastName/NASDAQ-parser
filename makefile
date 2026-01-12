@@ -18,4 +18,4 @@ clean :
 	rm $(TARGET)
 
 test : main
-	./main
+	./main 01302019.NASDAQ_ITCH50
