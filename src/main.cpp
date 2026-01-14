@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <iostream>
@@ -8,7 +7,7 @@
 #include <sys/stat.h>
 
 int main(int argc, char* argv[]){
-    int rdonly_file;
+    int rdonly_file, message_l;
     off_t file_size;
     struct stat file_stats;
 
@@ -57,11 +56,27 @@ int main(int argc, char* argv[]){
     }
     std::cout << std::endl;
     std::cout << std::dec;
-    for(off_t offset = 0; offset < file_size; offset++){
-        std::cout << static_cast<int>(mapped_file[offset]) + static_cast<int>(mapped_file[offset+1]);
-        break;
-    }
 
+    off_t offset = 0;
+    std::cout <<file_size << std::endl;
+    while (offset < file_size) {
+    //for(int num = 0; num < 100; num++){
+        std::cout << std::dec;0
+        message_l = static_cast<int>(mapped_file[offset]) + static_cast<int>(mapped_file[offset+1]);
+        std::cout <<message_l;// << ", " << offset;
+        std::cout << " | ";
+
+        std::cout << std::hex;
+        std::cout << std::setw(2) << std::setfill('0') << static_cast<int>(mapped_file[offset]) << " ";
+        std::cout << std::setw(2) << std::setfill('0') << static_cast<int>(mapped_file[offset+1]) << " ";
+        offset += 2;
+        for(off_t m = 0; m < message_l; m++){
+            std::cout << std::setw(2) << std::setfill('0') << static_cast<int>(mapped_file[offset+m]) << " ";
+        }
+        std::cout << std::endl;
+        offset += message_l;
+    }
+    std::cout << std::dec;
     std::cout << std::endl;
 
     if(munmap(mapped_file, file_size) == -1){
