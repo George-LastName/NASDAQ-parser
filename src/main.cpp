@@ -1,3 +1,4 @@
+#include <bits/types/locale_t.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fcntl.h>
@@ -76,33 +77,41 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
+struct {
+    int type      = 0;
+    int locate    = type+1;
+    int track_num = locate+2;
+    int timestamp = track_num+2;
+    int total     = timestamp+6;
+} common_offsets;
+
 void parse_message(std::uint8_t* filePtr, off_t& offset){
     // Decode Common Message Start
 
     // Name: Offset, Length.
     // Message Type: 0, 1
     std::cout << std::dec;
-    char type = static_cast<char>(filePtr[offset]);
+    char type = static_cast<char>(filePtr[offset+common_offsets.type]);
     std::cout << type << ", ";
 
     // Stock Locate: 1, 2
-    int stk_loc = (static_cast<uint16_t>(filePtr[offset+1]) << 8) | filePtr[offset+2];
+    int stk_loc = (static_cast<uint16_t>(filePtr[offset+common_offsets.locate]) << 8) | filePtr[offset+common_offsets.locate+1];
     std::cout << stk_loc << ", ";
 
     // Tracking Num: 3, 2
-    int trk_num = (static_cast<uint16_t>(filePtr[offset+3]) << 8) | filePtr[offset+4];
+    int trk_num = (static_cast<uint16_t>(filePtr[offset+common_offsets.track_num]) << 8) | filePtr[offset+common_offsets.track_num+1];
     std::cout << trk_num << ", ";
 
     // Timestamp: 5, 6
-    size_t tsmp_offs = 5;
+    //size_t tsmp_offs = 5;
     size_t tsmp_size = 6;
     std::uint64_t timestamp = 0;
-    auto time_span = std::span(filePtr + offset+tsmp_offs, tsmp_size);
+    auto time_span = std::span(filePtr + offset+common_offsets.timestamp, tsmp_size);
 
     for(std::uint8_t t :time_span){
         timestamp = (timestamp << 8) | t;
     }
-    offset += 11;
+    offset += common_offsets.total;
     std::cout << timestamp;
     std::cout << ", ";
 
@@ -118,6 +127,41 @@ void system_message_decode(std::uint8_t* filePtr, off_t& offset){
     char event_code = static_cast<char>(filePtr[offset++]);
     std::cout << event_code;
 }
+
+struct stock_dir_struct {
+    std::string stock;
+    char market_cat;
+    char fin_stat_ind;
+    std::uint64_t rnd_lot_size;
+    char rnd_lots_only;
+    char issue_class;
+    char issue_sub;
+    char auth;
+    char srt_thr_ind;
+    char IPO_flg;
+    char LULD_ref;
+    char ETP_flg;
+    uint64_t ETP_lev;
+    char inv_ind;
+};
+
+struct {
+    int stock         = 0;
+    int market_cat    = stock+8;
+    int fin_stat_ind  = market_cat+1;
+    int rnd_lot_size  = fin_stat_ind+1;
+    int rnd_lots_only = rnd_lot_size+4;
+    int issue_class   = rnd_lots_only+1;
+    int issue_sub     = issue_class+1;
+    int auth          = issue_sub+2;
+    int srt_thr_ind   = auth+1;
+    int IPO_flg       = srt_thr_ind+1;
+    int LULD_ref      = IPO_flg+1;
+    int ETP_flg       = LULD_ref+1;
+    int ETP_lev       = ETP_flg+1;
+    int inv_ind       = ETP_lev+4;
+    int total         = inv_ind+1;
+} stock_dir_offsets;
 
 void stock_directory_decode(std::uint8_t* filePtr, off_t& offset){
     std::uint8_t i = 0;
