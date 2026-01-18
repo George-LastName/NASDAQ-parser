@@ -12,6 +12,7 @@
 void system_message_decode(std::uint8_t* filePtr, off_t& offset);
 void stock_directory_decode(std::uint8_t* filePtr, off_t& offset);
 void parse_message(std::uint8_t* filePtr, off_t& offset);
+void parse_message2(uint8_t* filePtr, off_t& offset);
 
 int main(int argc, char* argv[]){
 
@@ -63,9 +64,21 @@ int main(int argc, char* argv[]){
             std::cout << static_cast<uint16_t>(mapped_file[offset+m]) << " ";
         }
         std::cout << "\n";
-        parse_message(mapped_file, offset);
+
+        // Timestamp: 5, 6
+        size_t tsmp_offs = 5;
+        size_t tsmp_size = 6;
+        std::uint64_t timestamp = 0;
+        auto time_span = std::span(mapped_file + offset+tsmp_offs, tsmp_size);
+
+        for(std::uint8_t t :time_span){
+            timestamp = (timestamp << 8) | t;
+        }
+        std::cout << timestamp << std::endl;
+
+        parse_message2(mapped_file, offset);
         std::cout << std::endl;
-        //offset += (message_l -11);
+        offset += (message_l);
     }
     std::cout << std::dec;
 
@@ -195,4 +208,67 @@ void stock_directory_decode(std::uint8_t* filePtr, off_t& offset){
     }
     std::string issue_sub(filePtr + offset+16, filePtr + offset + i+16);
     std::cout <<issue_sub << ", ";
+}
+
+struct [[gnu::packed]] ITCH_Header {
+    char type;
+    uint16_t locate;
+    uint16_t track_num;
+    uint8_t timestamp[6];
+
+    uint64_t get_timestamp() const{
+        uint64_t ti_st = 0;
+        for(uint8_t t : timestamp){
+            ti_st = (ti_st << 8) | t;
+        }
+        return ti_st;
+    }
+};
+
+struct [[gnu::packed]] Sys_Event {
+    ITCH_Header header;
+
+    char event_code;
+};
+
+struct [[gnu::packed]] Stock_Dir {
+    ITCH_Header header;
+
+    char stock[8];
+    char market_cat;
+    char fin_stat_ind;
+    uint32_t rnd_lot_size;
+    char rnd_lots_only;
+    char issue_class;
+    char issue_sub[2];
+    char auth;
+    char srt_thr_ind;
+    char IPO_flg;
+    char LULD_ref;
+    char ETP_flg;
+    uint32_t ETP_lev;
+    char inv_ind;
+};
+
+void parse_message2(uint8_t* filePtr, off_t& offset){
+    //
+    char type = static_cast<char>(filePtr[offset]);
+    switch (type) {
+        case 'S': {
+            auto* Mess = reinterpret_cast<const Sys_Event*>(filePtr+offset);
+            std::cout << Mess->header.get_timestamp() << std::endl;
+            break;
+        }
+        case 'R': {
+            auto* Mess = reinterpret_cast<const Stock_Dir*>(filePtr+offset);
+            std::cout << Mess->header.get_timestamp() << std::endl;
+            std::cout << Mess->stock << std::endl;
+            std::cout << Mess->market_cat << std::endl;
+            break;
+        }
+        default:{
+            std::cout << "ERROR: Unknown Message Type!" << std::endl;
+            break;
+        }
+    }
 }
