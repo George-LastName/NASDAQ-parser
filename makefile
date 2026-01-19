@@ -5,17 +5,29 @@ LDFLAGS = -lglfw -lGL -ldl
 INCLUDES = -I./src/
 
 
+FILE = 01302019.NASDAQ_ITCH50
 TARGET = main
+PROFILE = test
+
 SRC = $(wildcard src/*.cpp)
+HEADERS = $(wildcard src/*.h)
 
-all: $(TARGET)
-
-$(TARGET) : $(SRC)
+$(TARGET) : $(SRC) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(TARGET) $(SRC) $(LDFLAGS)
 
-.PHONY : clean test
+$(PROFILE) : $(SRC) $(HEADERS)
+	$(CXX) $(CXXFLAGS) -pg $(INCLUDES) -o $(PROFILE) $(SRC) $(LDFLAGS)
+
+
+.PHONY : clean run profile
 clean :
 	rm $(TARGET)
 
-test : main
-	./main 01302019.NASDAQ_ITCH50
+run : main
+	./main $(FILE)
+
+profile : test
+	./test $(FILE)
+
+clean_p :
+	rm $(PROFILE)
