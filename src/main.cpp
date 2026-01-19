@@ -51,7 +51,7 @@ int main(int argc, char* argv[]){
     uint16_t message_l;
 
     //while (offset < file_size) {
-    for(int num = 0; num < 2; num++){
+    for(int num = 0; num < 4; num++){
         message_l = (static_cast<uint16_t>(mapped_file[offset]) << 8) | mapped_file[offset+1];
 
         std::cout << std::hex;
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]){
         }
         std::cout << timestamp << std::endl;
 
-        parse_message2(mapped_file, offset);
+        parse_message(mapped_file, offset);
         std::cout << std::endl;
         offset += (message_l);
     }
@@ -130,18 +130,18 @@ struct [[gnu::packed]] Stock_Dir {
     char inv_ind;
 };
 
-void parse_message2(uint8_t* filePtr, off_t& offset){
+void parse_message(uint8_t* filePtr, off_t& offset){
     //
     char type = static_cast<char>(filePtr[offset]);
-    auto* Mess;
+    //auto* Mess;
     switch (type) {
         case 'S': {
-            Mess = reinterpret_cast<const Sys_Event*>(filePtr+offset);
+            auto* Mess = reinterpret_cast<const Sys_Event*>(filePtr+offset);
             std::cout << Mess->header.get_timestamp() << std::endl;
             break;
         }
         case 'R': {
-            Mess = reinterpret_cast<const Stock_Dir*>(filePtr+offset);
+            auto* Mess = reinterpret_cast<const Stock_Dir*>(filePtr+offset);
             std::cout << Mess->header.get_timestamp() << std::endl;
             std::cout << Mess->stock << std::endl;
             std::cout << Mess->market_cat << std::endl;
