@@ -1,5 +1,7 @@
 Market Data Handler
 
+Change of plan. Do it all from reading the file before getting involved with setting up a dummy UPD or MoldUDP server-client.
+
 Goals:
 Overall: Use historical NASDAQ ITCH data to help simulate reviceing market data.
 1) Get sample data.
