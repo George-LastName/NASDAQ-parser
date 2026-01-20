@@ -1,12 +1,12 @@
-#include <bits/types/locale_t.h>
-#include <cstdint>
-#include <cstdlib>
-#include <fcntl.h>
-#include <unistd.h>
-#include <iostream>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include "message_types.h"
+#include <cstdint> // uintX_t
+#include <fcntl.h> // O_RDONLY
+#include <unistd.h> // close
+#include <iostream> // cout et. all
+#include <sys/mman.h> // PROT_READ et. all & munmap
+#include <sys/stat.h> // fstat
+#include "message_types.h" // Messages
+
+int counts[256] = {0};
 
 static inline void parse_message(uint8_t* ptr){
 
@@ -18,12 +18,17 @@ static inline void parse_message(uint8_t* ptr){
      *  }
      */
 
+    counts[ptr[0]]++;
+
     switch (header->type) {
-        case 'S': {
+        // [[X]] helps complier order the jump table for better efficiency.
+        [[unlikely]] case 'S': {
             auto* Mess = reinterpret_cast<const Sys_Event*>(ptr);
             if (Mess->header.type != 'S'){
                 std::cout << "ERROR: Types do not match! S != " << Mess->header.type << "\n";
+                return;
             }
+            std::cout << Mess->header.get_time_from_mid() << ": " << Mess->event_code << "\n";
             break;
         }
         case 'R': {
@@ -55,42 +60,42 @@ static inline void parse_message(uint8_t* ptr){
             }
             break;
         }
-        case 'V': {
+        [[unlikely]] case 'V': {
             auto* Mess = reinterpret_cast<MWCB_Decline_Level*>(ptr);
             if (Mess->header.type != 'V'){
                 std::cout << "ERROR: Types do not match! V != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'W': {
+        [[unlikely]] case 'W': {
             auto* Mess = reinterpret_cast<MWCB_Status*>(ptr);
             if (Mess->header.type != 'W'){
                 std::cout << "ERROR: Types do not match! W != " << Mess->header.type << "\n";
             }
                 break;
         }
-        case 'K': {
+        [[unlikely]] case 'K': {
             auto* Mess = reinterpret_cast<Quoting_Period_Update*>(ptr);
             if (Mess->header.type != 'K'){
                 std::cout << "ERROR: Types do not match! K != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'J': {
+        [[unlikely]] case 'J': {
             auto* Mess = reinterpret_cast<LULD_Auction_Collar*>(ptr);
             if (Mess->header.type != 'J'){
                 std::cout << "ERROR: Types do not match! J != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'h': {
+        [[unlikely]] case 'h': {
             auto* Mess = reinterpret_cast<Operational_Halt*>(ptr);
             if (Mess->header.type != 'h'){
                 std::cout << "ERROR: Types do not match! h != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'A': {
+        [[likely]] case 'A': {
             auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
             if (Mess->header.type != 'A'){
                 std::cout << "ERROR: Types do not match! A != " << Mess->header.type << "\n";
@@ -125,14 +130,14 @@ static inline void parse_message(uint8_t* ptr){
             }
             break;
         }
-        case 'D': {
+        [[likely]] case 'D': {
             auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
             if (Mess->header.type != 'D'){
                 std::cout << "ERROR: Types do not match! D != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'U': {
+        [[likely]] case 'U': {
             auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
             if (Mess->header.type != 'U'){
                 std::cout << "ERROR: Types do not match! U != " << Mess->header.type << "\n";
@@ -153,7 +158,7 @@ static inline void parse_message(uint8_t* ptr){
             }
             break;
         }
-        case 'B': {
+        [[unlikely]] case 'B': {
             auto* Mess = reinterpret_cast<Broken_Trade*>(ptr);
             if (Mess->header.type != 'B'){
                 std::cout << "ERROR: Types do not match! B != " << Mess->header.type << "\n";
@@ -167,14 +172,14 @@ static inline void parse_message(uint8_t* ptr){
             }
             break;
         }
-        case 'N': {
+        [[unlikely]] case 'N': {
             auto* Mess = reinterpret_cast<RPII*>(ptr);
             if (Mess->header.type != 'N'){
                 std::cout << "ERROR: Types do not match! N != " << Mess->header.type << "\n";
             }
             break;
         }
-        case 'O': {
+        [[unlikely]] case 'O': {
             auto* Mess = reinterpret_cast<DLCR_Price_Discovery*>(ptr);
             if (Mess->header.type != 'O'){
                 std::cout << "ERROR: Types do not match! O != " << Mess->header.type << "\n";
@@ -231,6 +236,10 @@ int main(int argc, char* argv[]){
         parse_message(filePtr);
         filePtr += message_l;
     }
+
+    std::cout << "\n";
+    for (int i = 0; i < 256; i++)
+        if (counts[i] != 0) std::cout << static_cast<char>(i) << ": " << counts[i] << "\n";
 
     if(munmap(mapped_file, file_size) == -1){
         std::cout << "Failed to munmap." << std::endl;
