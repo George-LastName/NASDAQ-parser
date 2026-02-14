@@ -7,6 +7,7 @@
 #include <arpa/inet.h> // ntohl (big endian to little)
 
 
+// template to help easy std::cout << of the message if wanted.
 template<typename ITCH_type>
 struct ITCH_Message {
     friend std::ostream& operator<<(std::ostream& os, const ITCH_type* message){
