@@ -1,12 +1,15 @@
 #include <cstdint> // uintX_t
+#include <cstdlib>
 #include <fcntl.h> // O_RDONLY
 #include <unistd.h> // close
 #include <iostream> // cout et. all
 #include <sys/mman.h> // PROT_READ et. all & munmap
 #include <sys/stat.h> // fstat
+#include <unordered_set>
 #include "message_types.h" // Messages
 
 int counts[256] = {0};
+std::unordered_set<const Stock_Dir*, Stock_Dir_Hash, Stock_Dir_Equal> stock_symbols;
 
 static inline void parse_message(uint8_t* ptr){
 
@@ -18,172 +21,109 @@ static inline void parse_message(uint8_t* ptr){
      *  }
      */
 
-    counts[ptr[0]]++;
+    counts[header->type]++;
 
     switch (header->type) {
         // [[X]] helps complier order the jump table for better efficiency.
         [[unlikely]] case 'S': {
             auto* Mess = reinterpret_cast<const Sys_Event*>(ptr);
-            if (Mess->header.type != 'S'){
-                std::cout << "ERROR: Types do not match! S != " << Mess->header.type << "\n";
-                return;
-            }
             std::cout << Mess->header.get_time_from_mid() << ": " << Mess->event_code << "\n";
             break;
         }
         case 'R': {
             auto* Mess = reinterpret_cast<const Stock_Dir*>(ptr);
-            if (Mess->header.type != 'R'){
-                std::cout << "ERROR: Types do not match! R != " << Mess->header.type << "\n";
+            auto res = stock_symbols.insert(Mess);
+            if (!res.second){
+                std::cout << "Stock message happens more than once:";
+                std::cout.write(Mess->stock, 8) << "@" << Mess->header.get_time_from_mid() << "\n";
+            }
+            if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
+                std::cout << Mess;
             }
             break;
         }
         case 'H': {
             auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
-            if (Mess->header.type != 'H'){
-                std::cout << "ERROR: Types do not match! H != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'Y': {
             auto* Mess = reinterpret_cast<Reg_Sho_Restriction*>(ptr);
-
-            if (Mess->header.type != 'Y'){
-                std::cout << "ERROR: Types do not match! Y != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'L': {
             auto* Mess = reinterpret_cast<Market_Participant_Position*>(ptr);
-            if (Mess->header.type != 'L'){
-                std::cout << "ERROR: Types do not match! L != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'V': {
             auto* Mess = reinterpret_cast<MWCB_Decline_Level*>(ptr);
-            if (Mess->header.type != 'V'){
-                std::cout << "ERROR: Types do not match! V != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'W': {
             auto* Mess = reinterpret_cast<MWCB_Status*>(ptr);
-            if (Mess->header.type != 'W'){
-                std::cout << "ERROR: Types do not match! W != " << Mess->header.type << "\n";
-            }
                 break;
         }
         [[unlikely]] case 'K': {
             auto* Mess = reinterpret_cast<Quoting_Period_Update*>(ptr);
-            if (Mess->header.type != 'K'){
-                std::cout << "ERROR: Types do not match! K != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'J': {
             auto* Mess = reinterpret_cast<LULD_Auction_Collar*>(ptr);
-            if (Mess->header.type != 'J'){
-                std::cout << "ERROR: Types do not match! J != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'h': {
             auto* Mess = reinterpret_cast<Operational_Halt*>(ptr);
-            if (Mess->header.type != 'h'){
-                std::cout << "ERROR: Types do not match! h != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[likely]] case 'A': {
             auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
-            if (Mess->header.type != 'A'){
-                std::cout << "ERROR: Types do not match! A != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'F': {
             auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
-            if (Mess->header.type != 'F'){
-                std::cout << "ERROR: Types do not match! F != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'E': {
             auto* Mess = reinterpret_cast<Order_Executed*>(ptr);
-            if (Mess->header.type != 'E'){
-                std::cout << "ERROR: Types do not match! E != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'C': {
             auto* Mess = reinterpret_cast<Order_Executed_With_Price*>(ptr);
-            if (Mess->header.type != 'C'){
-                std::cout << "ERROR: Types do not match! C != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'X': {
             auto* Mess = reinterpret_cast<Order_Cancel*>(ptr);
-            if (Mess->header.type != 'X'){
-                std::cout << "ERROR: Types do not match! X != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[likely]] case 'D': {
             auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
-            if (Mess->header.type != 'D'){
-                std::cout << "ERROR: Types do not match! D != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[likely]] case 'U': {
             auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
-            if (Mess->header.type != 'U'){
-                std::cout << "ERROR: Types do not match! U != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'P': {
             auto* Mess = reinterpret_cast<Trade_Non_Cross*>(ptr);
-            if (Mess->header.type != 'P'){
-                std::cout << "ERROR: Types do not match! P != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'Q': {
             auto* Mess = reinterpret_cast<Cross_Trade*>(ptr);
-            if (Mess->header.type != 'Q'){
-                std::cout << "ERROR: Types do not match! Q != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'B': {
             auto* Mess = reinterpret_cast<Broken_Trade*>(ptr);
-            if (Mess->header.type != 'B'){
-                std::cout << "ERROR: Types do not match! B != " << Mess->header.type << "\n";
-            }
             break;
         }
         case 'I': {
             auto* Mess = reinterpret_cast<NOII*>(ptr);
-            if (Mess->header.type != 'I'){
-                std::cout << "ERROR: Types do not match! I != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'N': {
             auto* Mess = reinterpret_cast<RPII*>(ptr);
-            if (Mess->header.type != 'N'){
-                std::cout << "ERROR: Types do not match! N != " << Mess->header.type << "\n";
-            }
             break;
         }
         [[unlikely]] case 'O': {
             auto* Mess = reinterpret_cast<DLCR_Price_Discovery*>(ptr);
-            if (Mess->header.type != 'O'){
-                std::cout << "ERROR: Types do not match! O != " << Mess->header.type << "\n";
-            }
             break;
         }
         default:{
@@ -238,8 +178,13 @@ int main(int argc, char* argv[]){
     }
 
     std::cout << "\n";
-    for (int i = 0; i < 256; i++)
+    long sum = 0;
+    for (int i = 0; i < 256; i++){
         if (counts[i] != 0) std::cout << static_cast<char>(i) << ": " << counts[i] << "\n";
+        sum += counts[i];
+    }
+
+    std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
 
     if(munmap(mapped_file, file_size) == -1){
         std::cout << "Failed to munmap." << std::endl;

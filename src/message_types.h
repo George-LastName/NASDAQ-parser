@@ -3,6 +3,16 @@
 #include <cstdint> // uintX_t
 #include <chrono> // chrono:: for nanoseconds from midnight
 #include <cstring> // memcpy
+#include <string_view>
+#include <arpa/inet.h> // ntohl (big endian to little)
+
+
+template<typename ITCH_type>
+struct ITCH_Message {
+    friend std::ostream& operator<<(std::ostream& os, const ITCH_type* message){
+        return message->print(os);
+    }
+};
 
 struct [[gnu::packed]] ITCH_Header {
     char type;
@@ -27,9 +37,16 @@ struct [[gnu::packed]] ITCH_Header {
 struct [[gnu::packed]] Sys_Event {
     ITCH_Header header;
     char event_code;
+    /* O = Mess. Start,
+     * S = Sys Hours Start,
+     * Q = Market Open,
+     * M = Market Close,
+     * E = Sys Hours End,
+     * C = Mess. End
+     */
 };
 
-struct [[gnu::packed]] Stock_Dir {
+struct [[gnu::packed]] Stock_Dir : ITCH_Message<Stock_Dir> {
     ITCH_Header header;
     char stock[8];
     char market_cat;
@@ -45,6 +62,39 @@ struct [[gnu::packed]] Stock_Dir {
     char ETP_flg;
     std::uint32_t ETP_lev;
     char inv_ind;
+
+    std::ostream& print(std::ostream& os) const {
+        return os << "Type: " << header.type << "\n"
+        << "Locate: " << ntohs(header.locate) << "\n"
+        << "Tracking Number: " << ntohs(header.track_num) << "\n"
+        << "Timestamp: " << header.get_time_from_mid() << "\n"
+        << "  Stock: " << std::string_view(stock, 8) << "\n"
+        << "  Market Category: " << market_cat << "\n"
+        << "  Financial Status Indicator: " << fin_stat_ind << "\n"
+        << "  Round Lot Size: " << ntohl(rnd_lot_size) << "\n"
+        << "  Round Lots Only: " << rnd_lots_only << "\n"
+        << "  Issue Classification: " << issue_class << "\n"
+        << "  Issue Sub-Type: " << std::string_view(issue_sub, 2) << "\n"
+        << "  Authenticity: " << auth << "\n"
+        << "  Short Sale Threshold Indicator: " << srt_thr_ind << "\n"
+        << "  IPO Flag: " << IPO_flg << "\n"
+        << "  LULD Reference Price Tier: " << LULD_ref << "\n"
+        << "  ETP Flag: " << ETP_flg << "\n"
+        << "  ETP Leverage Factor: " << ntohl(ETP_lev) << "\n"
+        << "  Inverse Indicator: " << inv_ind << "\n";
+    }
+};
+
+struct Stock_Dir_Hash {
+    std::size_t operator()(const Stock_Dir* sd) const{
+        return std::hash<std::string_view>{}(std::string_view(sd->stock));
+    }
+};
+
+struct Stock_Dir_Equal {
+    bool operator()(const Stock_Dir* s1, const Stock_Dir* s2) const{
+        return strncmp(s1->stock, s2->stock, 8) == 0;
+    }
 };
 
 struct [[gnu::packed]] Stock_Trading_Action {

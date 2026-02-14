@@ -28,6 +28,7 @@ run : main
 
 profile : test
 	./test $(FILE)
+#gprof -b ./test gmon.out | c++filt > a.txt
 
 clean_p :
 	rm $(PROFILE)
