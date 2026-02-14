@@ -37,6 +37,7 @@ static inline void parse_message(uint8_t* ptr){
                 std::cout << "Stock message happens more than once:";
                 std::cout.write(Mess->stock, 8) << "@" << Mess->header.get_time_from_mid() << "\n";
             }
+            // Why only this stock sent twice????
             if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
                 std::cout << Mess;
             }
