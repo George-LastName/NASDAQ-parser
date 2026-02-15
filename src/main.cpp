@@ -6,14 +6,49 @@
 #include <sys/mman.h> // PROT_READ et. all & munmap
 #include <sys/stat.h> // fstat
 #include <unordered_set>
+#include <unordered_map>
 #include "message_types.h" // Messages
+
+#define HEADER_LENGTH 11
+
+enum class Market_State {
+    START_DAY,
+    START_SYSTEM,
+    START_MARKET,
+    END_MARKET,
+    END_SYSTEM,
+    END_DAY
+}
 
 int counts[256] = {0};
 std::unordered_set<const Stock_Dir*, Stock_Dir_Hash, Stock_Dir_Equal> stock_symbols;
+//std::unordered_map<std::uint16_t, >
+
+struct Price_Level {
+    std::uint32_t price;
+    std::vector<std::uint64_t> Order_References;
+};
+
+
+struct Stock_Order_Book {
+    std::uint16_t locate;
+    char stock[8];
+    // list of buy & sell orders
+    //  - what price
+    //  - ammount
+    //  - who/when
+
+};
+
+struct Listing {
+    std::uint16_t locate;
+    Stock_Dir* directory;
+}
 
 static inline void parse_message(uint8_t* ptr){
 
-    const auto* header = reinterpret_cast<ITCH_Header*>(ptr);
+    const auto* Header = reinterpret_cast<ITCH_Header*>(ptr);
+    ptr += HEADER_LENGTH;
 
     /* TODO: For SIMULATION, check if able to send message, if not wait until able.
      *  while(sim_time > header->timestamp){
@@ -21,13 +56,13 @@ static inline void parse_message(uint8_t* ptr){
      *  }
      */
 
-    counts[header->type]++;
+    counts[Header->type]++;
 
-    switch (header->type) {
+    switch (Header->type) {
         // [[X]] helps complier order the jump table for better efficiency.
         [[unlikely]] case 'S': {
             auto* Mess = reinterpret_cast<const Sys_Event*>(ptr);
-            std::cout << Mess->header.get_time_from_mid() << ": " << Mess->event_code << "\n";
+            std::cout << Header->get_time_from_mid() << ": " << Mess->event_code << "\n";
             break;
         }
         case 'R': {
@@ -35,12 +70,18 @@ static inline void parse_message(uint8_t* ptr){
             auto res = stock_symbols.insert(Mess);
             if (!res.second){
                 std::cout << "Stock message happens more than once:";
-                std::cout.write(Mess->stock, 8) << "@" << Mess->header.get_time_from_mid() << "\n";
+                std::cout.write(Mess->stock, 8) << "@" << Header->get_time_from_mid() << "\n";
             }
             // Why only this stock sent twice????
             if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
+                std::cout << Header->locate << " | " << Header->get_locate() << "\n";
                 std::cout << Mess;
             }
+            /*std::cout.write(Mess->stock, 8) << ", " << Mess->header.get_locate() << "\n";
+            if(Mess->header.get_locate() == 10){
+                exit(EXIT_SUCCESS);
+            }*/
+
             break;
         }
         case 'H': {
@@ -171,7 +212,7 @@ int main(int argc, char* argv[]){
 
     while (filePtr < file_end) {
     //for(int num = 0; num < 40; num++){
-        const uint16_t message_l = __builtin_bswap16(*reinterpret_cast<const uint16_t*>(filePtr));
+        const uint16_t message_l = ntohs(*reinterpret_cast<const uint16_t*>(filePtr));
         filePtr += 2;
 
         parse_message(filePtr);
