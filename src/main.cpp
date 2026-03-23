@@ -7,6 +7,7 @@
 #include <sys/stat.h> // fstat
 #include <unordered_set>
 #include <unordered_map>
+#include <string>
 #include "message_types.h" // Messages
 
 #define HEADER_LENGTH 11
@@ -18,11 +19,11 @@ enum class Market_State {
     END_MARKET,
     END_SYSTEM,
     END_DAY
-}
+};
 
 int counts[256] = {0};
 std::unordered_set<const Stock_Dir*, Stock_Dir_Hash, Stock_Dir_Equal> stock_symbols;
-//std::unordered_map<std::uint16_t, >
+std::unordered_map<std::string, std::array<int, 256>> stock_messages;
 
 struct Price_Level {
     std::uint32_t price;
@@ -43,7 +44,7 @@ struct Stock_Order_Book {
 struct Listing {
     std::uint16_t locate;
     Stock_Dir* directory;
-}
+};
 
 static inline void parse_message(uint8_t* ptr){
 
@@ -69,19 +70,14 @@ static inline void parse_message(uint8_t* ptr){
             auto* Mess = reinterpret_cast<const Stock_Dir*>(ptr);
             auto res = stock_symbols.insert(Mess);
             if (!res.second){
-                std::cout << "Stock message happens more than once:";
-                std::cout.write(Mess->stock, 8) << "@" << Header->get_time_from_mid() << "\n";
+                std::cout << Header->get_time_from_mid() << ": Stock message happens more than once: ";
+                std::cout.write(Mess->stock, 8) << "\n";
             }
             // Why only this stock sent twice????
-            if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
+            /*if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
                 std::cout << Header->locate << " | " << Header->get_locate() << "\n";
                 std::cout << Mess;
-            }
-            /*std::cout.write(Mess->stock, 8) << ", " << Mess->header.get_locate() << "\n";
-            if(Mess->header.get_locate() == 10){
-                exit(EXIT_SUCCESS);
             }*/
-
             break;
         }
         case 'H': {
@@ -227,6 +223,10 @@ int main(int argc, char* argv[]){
     }
 
     std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
+    for (const auto& stock :stock_symbols){
+        std::cout << std::string_view(stock->stock, 8) << ", ";
+    }
+    std::cout << "\n";
 
     if(munmap(mapped_file, file_size) == -1){
         std::cout << "Failed to munmap." << std::endl;

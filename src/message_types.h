@@ -3,6 +3,7 @@
 #include <cstdint> // uintX_t
 #include <chrono> // chrono:: for nanoseconds from midnight
 #include <cstring> // memcpy
+#include <netinet/in.h>
 #include <string_view>
 #include <arpa/inet.h> // ntohl (big endian to little)
 
@@ -36,6 +37,10 @@ struct [[gnu::packed]] ITCH_Header {
 
     auto get_locate() const{
         return ntohs(locate);
+    }
+
+    auto get_track_num() const{
+        return ntohs(track_num);
     }
 };
 
