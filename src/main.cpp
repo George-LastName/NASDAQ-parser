@@ -81,87 +81,87 @@ static inline void parse_message(uint8_t* ptr){
             break;
         }
         case 'H': {
-            auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
+            // auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
             break;
         }
         case 'Y': {
-            auto* Mess = reinterpret_cast<Reg_Sho_Restriction*>(ptr);
+            // auto* Mess = reinterpret_cast<Reg_Sho_Restriction*>(ptr);
             break;
         }
         case 'L': {
-            auto* Mess = reinterpret_cast<Market_Participant_Position*>(ptr);
+            // auto* Mess = reinterpret_cast<Market_Participant_Position*>(ptr);
             break;
         }
         [[unlikely]] case 'V': {
-            auto* Mess = reinterpret_cast<MWCB_Decline_Level*>(ptr);
+            // auto* Mess = reinterpret_cast<MWCB_Decline_Level*>(ptr);
             break;
         }
         [[unlikely]] case 'W': {
-            auto* Mess = reinterpret_cast<MWCB_Status*>(ptr);
+            // auto* Mess = reinterpret_cast<MWCB_Status*>(ptr);
                 break;
         }
         [[unlikely]] case 'K': {
-            auto* Mess = reinterpret_cast<Quoting_Period_Update*>(ptr);
+            // auto* Mess = reinterpret_cast<Quoting_Period_Update*>(ptr);
             break;
         }
         [[unlikely]] case 'J': {
-            auto* Mess = reinterpret_cast<LULD_Auction_Collar*>(ptr);
+            // auto* Mess = reinterpret_cast<LULD_Auction_Collar*>(ptr);
             break;
         }
         [[unlikely]] case 'h': {
-            auto* Mess = reinterpret_cast<Operational_Halt*>(ptr);
+            // auto* Mess = reinterpret_cast<Operational_Halt*>(ptr);
             break;
         }
         [[likely]] case 'A': {
-            auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
+            // auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
             break;
         }
         case 'F': {
-            auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
+            // auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
             break;
         }
         case 'E': {
-            auto* Mess = reinterpret_cast<Order_Executed*>(ptr);
+            // auto* Mess = reinterpret_cast<Order_Executed*>(ptr);
             break;
         }
         case 'C': {
-            auto* Mess = reinterpret_cast<Order_Executed_With_Price*>(ptr);
+            // auto* Mess = reinterpret_cast<Order_Executed_With_Price*>(ptr);
             break;
         }
         case 'X': {
-            auto* Mess = reinterpret_cast<Order_Cancel*>(ptr);
+            // auto* Mess = reinterpret_cast<Order_Cancel*>(ptr);
             break;
         }
         [[likely]] case 'D': {
-            auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
+            // auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
             break;
         }
         [[likely]] case 'U': {
-            auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
+            // auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
             break;
         }
         case 'P': {
-            auto* Mess = reinterpret_cast<Trade_Non_Cross*>(ptr);
+            // auto* Mess = reinterpret_cast<Trade_Non_Cross*>(ptr);
             break;
         }
         case 'Q': {
-            auto* Mess = reinterpret_cast<Cross_Trade*>(ptr);
+            // auto* Mess = reinterpret_cast<Cross_Trade*>(ptr);
             break;
         }
         [[unlikely]] case 'B': {
-            auto* Mess = reinterpret_cast<Broken_Trade*>(ptr);
+            // auto* Mess = reinterpret_cast<Broken_Trade*>(ptr);
             break;
         }
         case 'I': {
-            auto* Mess = reinterpret_cast<NOII*>(ptr);
+            // auto* Mess = reinterpret_cast<NOII*>(ptr);
             break;
         }
         [[unlikely]] case 'N': {
-            auto* Mess = reinterpret_cast<RPII*>(ptr);
+            // auto* Mess = reinterpret_cast<RPII*>(ptr);
             break;
         }
         [[unlikely]] case 'O': {
-            auto* Mess = reinterpret_cast<DLCR_Price_Discovery*>(ptr);
+            // auto* Mess = reinterpret_cast<DLCR_Price_Discovery*>(ptr);
             break;
         }
         default:{
@@ -222,11 +222,11 @@ int main(int argc, char* argv[]){
         sum += counts[i];
     }
 
-    std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
-    for (const auto& stock :stock_symbols){
-        std::cout << std::string_view(stock->stock, 8) << ", ";
-    }
-    std::cout << "\n";
+    // std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
+    // for (const auto& stock :stock_symbols){
+    //     std::cout << std::string_view(stock->stock, 8) << ", ";
+    // }
+    // std::cout << "\n";
 
     if(munmap(mapped_file, file_size) == -1){
         std::cout << "Failed to munmap." << std::endl;

@@ -276,4 +276,4 @@ struct [[gnu::packed]] DLCR_Price_Discovery {
     std::uint32_t upper_price_range_collar;
 };
 
-#endif
+#endif //MESSAGE_TYPES_H
