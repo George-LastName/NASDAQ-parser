@@ -222,7 +222,7 @@ int main(int argc, char* argv[]){
         sum += counts[i];
     }
 
-    // std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
+    std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
     // for (const auto& stock :stock_symbols){
     //     std::cout << std::string_view(stock->stock, 8) << ", ";
     // }
