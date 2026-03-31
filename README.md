@@ -7,9 +7,9 @@
 
 1. [x] Read and Decode Data
 2. [ ] Consume Decoded ITCH Messages
-   21. [ ] Order Book: 1.3.X and 1.4.X (WIP)
-   22. [ ] Stock Info: 1.2.X
-   23. [ ] Other...  : 1.5+
+   1. [ ] Order Book: 1.3.X and 1.4.X (WIP)
+   2. [ ] Stock Info: 1.2.X
+   3. [ ] Other...  : 1.5+
 3. [ ] Control Speed, have "real time", 2x, 3x.
 4. [ ] GUI(?) of order book, with price, depth and volume graphs
 or
