@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++23
-LDFLAGS = -lglfw -lGL -ldl
+LDFLAGS = -ldl
 
 INCLUDES = -I./src/
 
