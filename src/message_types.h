@@ -92,6 +92,8 @@ struct [[gnu::packed]] Stock_Dir : ITCH_Message<Stock_Dir> {
         << "  ETP Leverage Factor: " << ntohl(ETP_lev) << "\n"
         << "  Inverse Indicator: " << inv_ind << "\n";
     }
+
+    std::string_view get_stock() { return std::string_view(stock, 8); }
 };
 
 struct Stock_Dir_Hash {

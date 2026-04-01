@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <string>
 #include "message_types.h" // Messages
+#include "OrderBook.h"
 
 #define HEADER_LENGTH 11
 
@@ -24,27 +25,7 @@ enum class Market_State {
 int counts[256] = {0};
 std::unordered_set<const Stock_Dir*, Stock_Dir_Hash, Stock_Dir_Equal> stock_symbols;
 std::unordered_map<std::string, std::array<int, 256>> stock_messages;
-
-struct Price_Level {
-    std::uint32_t price;
-    std::vector<std::uint64_t> Order_References;
-};
-
-
-struct Stock_Order_Book {
-    std::uint16_t locate;
-    char stock[8];
-    // list of buy & sell orders
-    //  - what price
-    //  - ammount
-    //  - who/when
-
-};
-
-struct Listing {
-    std::uint16_t locate;
-    Stock_Dir* directory;
-};
+std::unordered_map<uint16_t, Order_Book> stock_books;
 
 static inline void parse_message(uint8_t* ptr){
 
@@ -78,10 +59,12 @@ static inline void parse_message(uint8_t* ptr){
                 std::cout << Header->locate << " | " << Header->get_locate() << "\n";
                 std::cout << Mess;
             }*/
+            stock_books[Header->get_locate()] = Order_Book(std::string_view(Mess->stock, 8));
             break;
         }
         case 'H': {
-            // auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
+            auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
+            stock_books[Header->get_locate()].Set_State(Mess->trading_state);
             break;
         }
         case 'Y': {
@@ -114,10 +97,12 @@ static inline void parse_message(uint8_t* ptr){
         }
         [[likely]] case 'A': {
             // auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
+            stock_books[Header->get_locate()].Add(Header->type);
             break;
         }
         case 'F': {
             // auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
+            stock_books[Header->get_locate()].Add(Header->type);
             break;
         }
         case 'E': {
