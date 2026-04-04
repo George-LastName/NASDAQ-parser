@@ -1,6 +1,5 @@
 #include "OrderBook.h"
 #include "message_types.h"
-#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
