@@ -97,12 +97,12 @@ static inline void parse_message(uint8_t* ptr){
         }
         [[likely]] case 'A': {
             auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
-            stock_books[Header->get_locate()].Add(Mess);
+            stock_books[Header->get_locate()].Add(*Mess);
             break;
         }
         case 'F': {
             auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
-            stock_books[Header->get_locate()].Add(Mess);
+            stock_books[Header->get_locate()].Add(*Mess);
             break;
         }
         case 'E': {

@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <map>
 #include <unordered_map>
-#include <deque>
-#include <string>
 #include "message_types.h"
 
 enum Trading_State {
@@ -34,21 +32,14 @@ private:
 public:
     Order_Book() {};
     Order_Book(std::string_view stock);
-    std::string_view Get_Stock() { return stock_name;}
     // Stock Info
     Trading_State Get_State(){ return state; }
     void Set_State(char new_state);
 
     // Order Book Updates
     //add Order - A, F
-    void Add(const Add_Order_No_MPID* order);
-    void Add(const Add_Order_MPID* order);
-    void Add(uint64_t ref,
-                               char buy_sell_indicator,
-                               uint32_t shares,
-                               uint32_t price,
-                               std::string MPID,
-                               bool convert_from_bin);
+    template<typename T>
+    void Add(const T& order);
 
     // Update bids or asks.
     void Log_Order(const char* indicator, const std::uint32_t* price,  std::uint32_t* share_num);

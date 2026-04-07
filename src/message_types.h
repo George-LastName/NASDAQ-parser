@@ -3,7 +3,6 @@
 #include <cstdint> // uintX_t
 #include <chrono> // chrono:: for nanoseconds from midnight
 #include <cstring> // memcpy
-#include <netinet/in.h>
 #include <string_view>
 #include <arpa/inet.h> // ntohl (big endian to little)
 
