@@ -198,7 +198,6 @@ int main(int argc, char* argv[]){
     const std::uint8_t* file_end = mapped_file + file_size;
 
     while (filePtr < file_end) {
-    //for(int num = 0; num < 40; num++){
         const uint16_t message_l = ntohs(*reinterpret_cast<const uint16_t*>(filePtr));
         filePtr += 2;
 
