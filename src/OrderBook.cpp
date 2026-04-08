@@ -4,7 +4,7 @@
 #include <string>
 
 #include "OrderBook.h"
-#include "message_types.h"
+#include "MessageTypes.h"
 
 Order_Book::Order_Book(std::string_view stock){
     state = Trading_State::Halt;
@@ -37,17 +37,17 @@ void Order_Book::Set_State(char new_state){
 }
 
 template<typename T>
-void Order_Book::Add(const T& order){
+void Order_Book::Add(const T* order){
     Order new_order;
 
     if constexpr (std::is_same_v<T, Add_Order_MPID>) {
-        new_order.MPID = std::string(order.attribution, 4);
+        new_order.MPID = std::string(order->attribution, 4);
     }
-    new_order.indicator = order.buy_sell_indicator;
-    new_order.shares    = ntohl(order.shares);
-    new_order.price     = ntohl(order.price);
+    new_order.indicator = order->buy_sell_indicator;
+    new_order.shares    = ntohl(order->shares);
+    new_order.price     = ntohl(order->price);
 
-    orders.insert({order.order_reference_number, new_order});
+    orders.insert({order->order_reference_number, new_order});
 
     if(new_order.indicator != 'B' && new_order.indicator != 'S'){
         std::cout << "Invalid Side for " << stock_name << " : |" << new_order.indicator << "|\n";
@@ -58,5 +58,134 @@ void Order_Book::Add(const T& order){
     side[new_order.price] += new_order.shares;
 }
 
-template void Order_Book::Add(const Add_Order_MPID& order);
-template void Order_Book::Add(const Add_Order_No_MPID& order);
+template void Order_Book::Add(const Add_Order_MPID* order);
+template void Order_Book::Add(const Add_Order_No_MPID* order);
+
+
+void Order_Book::Execute(const Order_Executed* order){
+    auto it = orders.find(order->order_reference_number);
+    if(it == orders.end()){
+        std::cout << "Order reference not found for execution: " << order->order_reference_number << "\n";
+        return;
+    }
+
+    Order& exec_order = it->second;
+    uint32_t executed_shares = ntohl(order->executed_shares);
+
+    if(executed_shares > exec_order.shares){
+        std::cout << "Executed shares exceed order shares for " << stock_name << "\n";
+        return;
+    }
+
+    auto& side = (exec_order.indicator == 'B') ? bids : asks;
+    side[exec_order.price] -= executed_shares;
+    if(side[exec_order.price] == 0){
+        side.erase(exec_order.price);
+    }
+
+    exec_order.shares -= executed_shares;
+    if(exec_order.shares == 0){
+        orders.erase(it);
+    }
+}
+
+void Order_Book::Execute(const Order_Executed_With_Price* order){
+    auto it = orders.find(order->order_reference_number);
+    if(it == orders.end()){
+        std::cout << "Order reference not found for execution with price: " << order->order_reference_number << "\n";
+        return;
+    }
+
+    Order& exec_order = it->second;
+    uint32_t executed_shares = ntohl(order->executed_shares);
+
+    if(executed_shares > exec_order.shares){
+        std::cout << "Executed shares exceed order shares for " << stock_name << "\n";
+        return;
+    }
+
+    auto& side = (exec_order.indicator == 'B') ? bids : asks;
+    side[exec_order.price] -= executed_shares;
+    if(side[exec_order.price] == 0){
+        side.erase(exec_order.price);
+    }
+
+    exec_order.shares -= executed_shares;
+    if(exec_order.shares == 0){
+        orders.erase(it);
+    }
+}
+
+void Order_Book::Cancel(const Order_Cancel* order){
+    auto it = orders.find(order->order_reference_number);
+    if(it == orders.end()){
+        std::cout << "Order reference not found for cancellation: " << order->order_reference_number << "\n";
+        return;
+    }
+
+    Order& cancel_order = it->second;
+    uint32_t canceled_shares = ntohl(order->canceled_shares);
+
+    if(canceled_shares > cancel_order.shares){
+        std::cout << "Canceled shares exceed order shares for " << stock_name << "\n";
+        return;
+    }
+
+    auto& side = (cancel_order.indicator == 'B') ? bids : asks;
+    side[cancel_order.price] -= canceled_shares;
+    if(side[cancel_order.price] == 0){
+        side.erase(cancel_order.price);
+    }
+
+    cancel_order.shares -= canceled_shares;
+    if(cancel_order.shares == 0){
+        orders.erase(it);
+    }
+}
+
+void Order_Book::Delete(const Order_Delete* order){
+    auto it = orders.find(order->order_reference_number);
+    if(it == orders.end()){
+        std::cout << "Order reference not found for deletion: " << order->order_reference_number << "\n";
+        return;
+    }
+
+    Order& delete_order = it->second;
+
+    auto& side = (delete_order.indicator == 'B') ? bids : asks;
+    side[delete_order.price] -= delete_order.shares;
+    if(side[delete_order.price] == 0){
+        side.erase(delete_order.price);
+    }
+
+    orders.erase(it);
+}
+
+void Order_Book::Replace(const Order_Replace* order){
+    auto it = orders.find(order->original_order_reference_number);
+    if(it == orders.end()){
+        std::cout << "Original order reference not found for replacement: " << order->original_order_reference_number << "\n";
+        return;
+    }
+
+    Order& old_order = it->second;
+
+    auto& side = (old_order.indicator == 'B') ? bids : asks;
+    side[old_order.price] -= old_order.shares;
+    if(side[old_order.price] == 0){
+        side.erase(old_order.price);
+    }
+
+    Order new_order;
+    new_order.indicator = old_order.indicator;
+    new_order.shares    = ntohl(order->shares);
+    new_order.price     = ntohl(order->price);
+    new_order.MPID      = old_order.MPID;
+
+    orders.erase(it);
+    orders.insert({order->new_order_reference_number, new_order});
+
+    side[new_order.price] += new_order.shares;
+}
+
+

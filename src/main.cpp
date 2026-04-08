@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <string>
-#include "message_types.h" // Messages
+#include "MessageTypes.h" // Messages
 #include "OrderBook.h"
 
 #define HEADER_LENGTH 11
@@ -39,6 +39,7 @@ static inline void parse_message(uint8_t* ptr){
      */
 
     counts[Header->type]++;
+    auto& stock = stock_books[Header->get_locate()];
 
     switch (Header->type) {
         // [[X]] helps complier order the jump table for better efficiency.
@@ -59,12 +60,12 @@ static inline void parse_message(uint8_t* ptr){
                 std::cout << Header->locate << " | " << Header->get_locate() << "\n";
                 std::cout << Mess;
             }*/
-            stock_books[Header->get_locate()] = Order_Book(std::string_view(Mess->stock, 8));
+            stock = Order_Book(std::string_view(Mess->stock, 8));
             break;
         }
         case 'H': {
             auto* Mess = reinterpret_cast<Stock_Trading_Action*>(ptr);
-            stock_books[Header->get_locate()].Set_State(Mess->trading_state);
+            stock.Set_State(Mess->trading_state);
             break;
         }
         case 'Y': {
@@ -97,32 +98,37 @@ static inline void parse_message(uint8_t* ptr){
         }
         [[likely]] case 'A': {
             auto* Mess = reinterpret_cast<Add_Order_No_MPID*>(ptr);
-            stock_books[Header->get_locate()].Add(*Mess);
+            stock.Add(Mess);
             break;
         }
         case 'F': {
             auto* Mess = reinterpret_cast<Add_Order_MPID*>(ptr);
-            stock_books[Header->get_locate()].Add(*Mess);
+            stock.Add(Mess);
             break;
         }
         case 'E': {
-            // auto* Mess = reinterpret_cast<Order_Executed*>(ptr);
+            auto* Mess =  reinterpret_cast<Order_Executed*>(ptr);
+            stock.Execute(Mess);
             break;
         }
         case 'C': {
-            // auto* Mess = reinterpret_cast<Order_Executed_With_Price*>(ptr);
+            auto* Mess = reinterpret_cast<Order_Executed_With_Price*>(ptr);
+            stock.Execute(Mess);
             break;
         }
         case 'X': {
-            // auto* Mess = reinterpret_cast<Order_Cancel*>(ptr);
+            auto* Mess = reinterpret_cast<Order_Cancel*>(ptr);
+            stock.Cancel(Mess);
             break;
         }
         [[likely]] case 'D': {
-            // auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
+            auto* Mess = reinterpret_cast<Order_Delete*>(ptr);
+            stock.Delete(Mess);
             break;
         }
         [[likely]] case 'U': {
-            // auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
+            auto* Mess = reinterpret_cast<Order_Replace*>(ptr);
+            stock.Replace(Mess);
             break;
         }
         case 'P': {

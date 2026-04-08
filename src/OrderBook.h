@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <unordered_map>
-#include "message_types.h"
+#include "MessageTypes.h"
 
 enum Trading_State {
     Halt,
@@ -39,19 +39,17 @@ public:
     // Order Book Updates
     //add Order - A, F
     template<typename T>
-    void Add(const T& order);
+    void Add(const T* order);
 
-    // Update bids or asks.
-    void Log_Order(const char* indicator, const std::uint32_t* price,  std::uint32_t* share_num);
     //execute Order - E, C
     void Execute(const Order_Executed* order);
     void Execute(const Order_Executed_With_Price* order);
-    //cancel - x
-    void Cancel();
+    //cancel - X
+    void Cancel(const Order_Cancel* order);
     //delete - D
-    void Delete();
+    void Delete(const Order_Delete* order);
     //replace - U
-    void Replace();
+    void Replace(const Order_Replace* order);
 };
 
 #endif //ORDER_BOOK_H
