@@ -1,25 +1,35 @@
 cmake_minimum_required(VERSION 4.3.1)
 
-project (ITCHParser
+project (ITCH_Viewer
          VERSION 0.1
          )
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(main
+add_executable(${PROJECT_NAME}
     src/main.cpp
     src/OrderBook.cpp
     )
 
-target_compile_options(main
+add_subdirectory(contribs/clickhouse-cpp)
+
+
+target_compile_options(${PROJECT_NAME}
     PRIVATE
     -Wall
     -Wextra
     -Wpedantic
     )
 
-target_link_libraries(main
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+    contribs/clickhouse-cpp
+    contribs/clickhouse-cpp/contrib/absl
+    )
+
+target_link_libraries(${PROJECT_NAME}
     PRIVATE
     dl
+    clickhouse-cpp-lib
     )

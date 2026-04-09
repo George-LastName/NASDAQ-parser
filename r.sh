@@ -8,11 +8,11 @@ clean() {
 
 build() {
     cmake -S . -B build
-    cmake --build build
+    cmake --build build -j32
 }
 
 run() {
-    ./build/main 01302019.NASDAQ_ITCH50
+    ./build/ITCH_Viewer 01302019.NASDAQ_ITCH50
 }
 
 case $1 in

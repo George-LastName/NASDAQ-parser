@@ -1,13 +1,20 @@
 #include <cstdint> // uintX_t
 #include <cstdlib>
-#include <fcntl.h> // O_RDONLY
 #include <unistd.h> // close
+#include <fcntl.h> // O_RDONLY
+
 #include <iostream> // cout et. all
+#include <string>
+
 #include <sys/mman.h> // PROT_READ et. all & munmap
 #include <sys/stat.h> // fstat
+
 #include <unordered_set>
 #include <unordered_map>
-#include <string>
+
+// Clickhouse (DB)
+#include <clickhouse/client.h>
+
 #include "MessageTypes.h" // Messages
 #include "OrderBook.h"
 
@@ -23,7 +30,6 @@ enum class Market_State {
 };
 
 int counts[256] = {0};
-std::unordered_set<const Stock_Dir*, Stock_Dir_Hash, Stock_Dir_Equal> stock_symbols;
 std::unordered_map<std::string, std::array<int, 256>> stock_messages;
 std::unordered_map<uint16_t, Order_Book> stock_books;
 
@@ -50,16 +56,6 @@ static inline void parse_message(uint8_t* ptr){
         }
         case 'R': {
             auto* Mess = reinterpret_cast<const Stock_Dir*>(ptr);
-            auto res = stock_symbols.insert(Mess);
-            if (!res.second){
-                std::cout << Header->get_time_from_mid() << ": Stock message happens more than once: ";
-                std::cout.write(Mess->stock, 8) << "\n";
-            }
-            // Why only this stock sent twice????
-            /*if(strncmp("CFG-D    ", Mess->stock, 8) == 0){
-                std::cout << Header->locate << " | " << Header->get_locate() << "\n";
-                std::cout << Mess;
-            }*/
             stock = Order_Book(std::string_view(Mess->stock, 8));
             break;
         }
@@ -164,6 +160,7 @@ static inline void parse_message(uint8_t* ptr){
 
 int main(int argc, char* argv[]){
 
+    // Check file path has been provided
     if (argc != 2) {
         std::cout << "Second argument must be file path/filename." << std::endl;
         exit(EXIT_FAILURE);
@@ -171,6 +168,7 @@ int main(int argc, char* argv[]){
 
     const char* filepath = argv[1];
 
+    // Open file and get file size
     int rdonly_file = open(filepath, O_RDONLY);
     if (rdonly_file == -1){
         std::cout << "Failed to open file" << std::endl;
@@ -186,6 +184,7 @@ int main(int argc, char* argv[]){
 
     const off_t file_size = file_stats.st_size;
 
+    // Get pointer to start of provided file
     std::uint8_t* mapped_file = reinterpret_cast<std::uint8_t*>(mmap((caddr_t)0, file_size, PROT_READ, MAP_SHARED, rdonly_file, 0));
     if(mapped_file == MAP_FAILED){
         std::cout << "Failed to mmap file.\n" << std::endl;
@@ -194,9 +193,16 @@ int main(int argc, char* argv[]){
     }
     close(rdonly_file);
 
+
+    // clickhouse::Client client{clickhouse::ClientOptions().SetHost("localhost")};
+
+
+
+
     std::uint8_t* filePtr = mapped_file;
     const std::uint8_t* file_end = mapped_file + file_size;
 
+    // Loop through file
     while (filePtr < file_end) {
         const uint16_t message_l = ntohs(*reinterpret_cast<const uint16_t*>(filePtr));
         filePtr += 2;
@@ -212,11 +218,7 @@ int main(int argc, char* argv[]){
         sum += counts[i];
     }
 
-    std::cout << "Stock Count: " << stock_symbols.size() << "\n" << "Message Count: " << sum << "\n";
-    // for (const auto& stock :stock_symbols){
-    //     std::cout << std::string_view(stock->stock, 8) << ", ";
-    // }
-    // std::cout << "\n";
+    std::cout << "\n";
 
     if(munmap(mapped_file, file_size) == -1){
         std::cout << "Failed to munmap." << std::endl;
