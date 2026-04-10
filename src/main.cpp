@@ -33,6 +33,28 @@ int counts[256] = {0};
 std::unordered_map<std::string, std::array<int, 256>> stock_messages;
 std::unordered_map<uint16_t, Order_Book> stock_books;
 
+static std::string sanitise_table_name(const std::string& path) {
+    // Strip directory prefix — take only the filename
+    const size_t slash = path.rfind('/');
+    std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+
+    // Replace any character that isn't alphanumeric or underscore with '_'
+    for (char& c : name) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+            c = '_';
+        }
+    }
+
+    // Prefix with '_' if the name starts with a digit
+    if (!name.empty() && std::isdigit(static_cast<unsigned char>(name[0]))) {
+        name = "_" + name;
+    }
+
+    return name;
+}
+
+
+
 static inline void parse_message(uint8_t* ptr){
 
     const auto* Header = reinterpret_cast<ITCH_Header*>(ptr);
@@ -193,10 +215,28 @@ int main(int argc, char* argv[]){
     }
     close(rdonly_file);
 
-
-    // clickhouse::Client client{clickhouse::ClientOptions().SetHost("localhost")};
-
-
+    std::string database_name = "Market_Data";
+    std::string table_name = sanitise_table_name(filepath);
+    clickhouse::Client client{clickhouse::ClientOptions().SetHost("localhost")};
+    client.Execute(
+        "CREATE DATABASE IF NOT EXISTS " + database_name
+    );
+    client.Execute(R"(
+        CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(
+            (
+                stock_id        UInt16,
+             stock_name      LowCardinality(String),
+             timestamp_ns    UInt64,
+             bid_prices      Array(UInt32),
+             bid_shares      Array(UInt32),
+             ask_prices      Array(UInt32),
+             ask_shares      Array(UInt32)
+            )
+            ENGINE = ReplacingMergeTree()
+            PARTITION BY stock_id
+            ORDER BY (stock_id, timestamp_ns)
+            SETTINGS index_granularity = 8192
+    )");
 
 
     std::uint8_t* filePtr = mapped_file;
