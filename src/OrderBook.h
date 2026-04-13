@@ -4,7 +4,15 @@
 #include <cstdint>
 #include <map>
 #include <unordered_map>
+#include <vector>
 #include "MessageTypes.h"
+
+struct BookSnapshot {
+    std::vector<uint32_t> bid_prices;
+    std::vector<uint32_t> bid_shares;
+    std::vector<uint32_t> ask_prices;
+    std::vector<uint32_t> ask_shares;
+};
 
 enum Trading_State {
     Halt,
@@ -33,8 +41,12 @@ public:
     Order_Book() {};
     Order_Book(std::string_view stock);
     // Stock Info
+    const std::string& GetName() const { return stock_name; }
+    bool IsInitialised() const { return !stock_name.empty(); }
     Trading_State Get_State(){ return state; }
     void Set_State(char new_state);
+    // Snapshot
+    BookSnapshot GetSnapshot(size_t top_n) const;
 
     // Order Book Updates
     //add Order - A, F

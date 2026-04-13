@@ -14,11 +14,16 @@
 
 // Clickhouse (DB)
 #include <clickhouse/client.h>
+#include <clickhouse/columns/array.h>
+#include <clickhouse/columns/lowcardinality.h>
+#include <clickhouse/columns/numeric.h>
+#include <clickhouse/columns/string.h>
 
 #include "MessageTypes.h" // Messages
 #include "OrderBook.h"
 
 #define HEADER_LENGTH 11
+static constexpr size_t TOP_N = 10;
 
 enum class Market_State {
     START_DAY,
@@ -30,6 +35,7 @@ enum class Market_State {
 };
 
 int counts[256] = {0};
+int snapshots = 0;
 std::unordered_map<std::string, std::array<int, 256>> stock_messages;
 std::unordered_map<uint16_t, Order_Book> stock_books;
 
@@ -54,6 +60,53 @@ static std::string sanitise_table_name(const std::string& path) {
 }
 
 
+
+static void snapshot_all_books(
+    clickhouse::Client& client,
+    const std::string& full_table,
+    uint64_t timestamp_ns,
+    const std::unordered_map<uint16_t, Order_Book>& books,
+    size_t top_n)
+{
+    auto col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
+    auto col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    auto col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
+    auto col_bid_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    auto col_bid_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    auto col_ask_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    auto col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+
+    for (const auto& [stock_id, book] : books) {
+        if (!book.IsInitialised()) continue;
+
+        const auto snap = book.GetSnapshot(top_n);
+
+        col_stock_id->Append(stock_id);
+        col_stock_name->Append(std::string_view(book.GetName()));
+        col_timestamp->Append(timestamp_ns);
+        col_bid_prices->Append(snap.bid_prices);
+        col_bid_shares->Append(snap.bid_shares);
+        col_ask_prices->Append(snap.ask_prices);
+        col_ask_shares->Append(snap.ask_shares);
+    }
+
+    if (col_stock_id->Size() == 0) return;
+
+    clickhouse::Block block;
+    block.AppendColumn("stock_id",     col_stock_id);
+    block.AppendColumn("stock_name",   col_stock_name);
+    block.AppendColumn("timestamp_ns", col_timestamp);
+    block.AppendColumn("bid_prices",   col_bid_prices);
+    block.AppendColumn("bid_shares",   col_bid_shares);
+    block.AppendColumn("ask_prices",   col_ask_prices);
+    block.AppendColumn("ask_shares",   col_ask_shares);
+
+    client.Insert(full_table, block);
+
+    std::chrono::nanoseconds duration(timestamp_ns);
+    std::chrono::hh_mm_ss real_time{duration};
+    std::cout << real_time << ": " << snapshots++ << "\n";
+}
 
 static inline void parse_message(uint8_t* ptr){
 
@@ -217,39 +270,55 @@ int main(int argc, char* argv[]){
 
     std::string database_name = "Market_Data";
     std::string table_name = sanitise_table_name(filepath);
-    clickhouse::Client client{clickhouse::ClientOptions().SetHost("localhost")};
-    client.Execute(
-        "CREATE DATABASE IF NOT EXISTS " + database_name
-    );
-    client.Execute(R"(
-        CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(
-            (
-                stock_id        UInt16,
-             stock_name      LowCardinality(String),
-             timestamp_ns    UInt64,
-             bid_prices      Array(UInt32),
-             bid_shares      Array(UInt32),
-             ask_prices      Array(UInt32),
-             ask_shares      Array(UInt32)
-            )
-            ENGINE = ReplacingMergeTree()
-            PARTITION BY stock_id
-            ORDER BY (stock_id, timestamp_ns)
-            SETTINGS index_granularity = 8192
-    )");
 
+    {
+        clickhouse::Client client{clickhouse::ClientOptions().SetHost("localhost")};
+        client.Execute(
+            "CREATE DATABASE IF NOT EXISTS " + database_name
+        );
+        client.Execute(R"(
+            CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(
+                (
+                    stock_id        UInt16,
+                 stock_name      LowCardinality(String),
+                 timestamp_ns    UInt64,
+                 bid_prices      Array(UInt32),
+                 bid_shares      Array(UInt32),
+                 ask_prices      Array(UInt32),
+                 ask_shares      Array(UInt32)
+                )
+                ENGINE = ReplacingMergeTree()
+                ORDER BY (stock_id, timestamp_ns)
+                SETTINGS index_granularity = 8192
+        )");
 
-    std::uint8_t* filePtr = mapped_file;
-    const std::uint8_t* file_end = mapped_file + file_size;
+        std::uint8_t* filePtr = mapped_file;
+        const std::uint8_t* file_end = mapped_file + file_size;
+        const std::string full_table = database_name + "." + table_name;
+        uint64_t last_snapshot_ns = 0;
+        uint64_t ts = 0;
 
-    // Loop through file
-    while (filePtr < file_end) {
-        const uint16_t message_l = ntohs(*reinterpret_cast<const uint16_t*>(filePtr));
-        filePtr += 2;
+        // Loop through file
+        while (filePtr < file_end) {
+            const uint16_t message_l = ntohs(*reinterpret_cast<const uint16_t*>(filePtr));
+            filePtr += 2;
 
-        parse_message(filePtr);
-        filePtr += message_l;
-    }
+            ts = reinterpret_cast<const ITCH_Header*>(filePtr)->get_timestamp();
+
+            parse_message(filePtr);
+
+            if (ts - last_snapshot_ns >= 1'000'000'000ULL) {
+                snapshot_all_books(client, full_table, ts, stock_books, TOP_N);
+                last_snapshot_ns = ts;
+            }
+
+            filePtr += message_l;
+        }
+
+        //final snapshot
+        snapshot_all_books(client, full_table, ts, stock_books, TOP_N);
+
+    } // client destroyed here — sends proper TCP disconnect before munmap/return
 
     std::cout << "\n";
     long sum = 0;

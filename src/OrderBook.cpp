@@ -61,6 +61,26 @@ void Order_Book::Add(const T* order){
 template void Order_Book::Add(const Add_Order_MPID* order);
 template void Order_Book::Add(const Add_Order_No_MPID* order);
 
+BookSnapshot Order_Book::GetSnapshot(size_t top_n) const {
+    BookSnapshot snap;
+
+    // Top N bids: highest prices first (reverse-iterate the ascending map)
+    size_t count = 0;
+    for (auto it = bids.rbegin(); it != bids.rend() && count < top_n; ++it, ++count) {
+        snap.bid_prices.push_back(it->first);
+        snap.bid_shares.push_back(it->second);
+    }
+
+    // Top N asks: lowest prices first (forward-iterate)
+    count = 0;
+    for (auto it = asks.begin(); it != asks.end() && count < top_n; ++it, ++count) {
+        snap.ask_prices.push_back(it->first);
+        snap.ask_shares.push_back(it->second);
+    }
+
+    return snap;
+}
+
 
 void Order_Book::Execute(const Order_Executed* order){
     auto it = orders.find(order->order_reference_number);

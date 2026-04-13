@@ -3,3 +3,4 @@ notes.txt
 NQTVITCHspecification.pdf
 setup.sh
 clickhouse_server/*
+Dockerfile
