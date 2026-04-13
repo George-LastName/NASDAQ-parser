@@ -66,21 +66,25 @@ static void snapshot_all_books(
     const std::string& full_table,
     uint64_t timestamp_ns,
     const std::unordered_map<uint16_t, Order_Book>& books,
-    size_t top_n)
+    size_t top_n,
+    bool force_flush = false)
 {
-    auto col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
-    auto col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
-    auto col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
-    auto col_bid_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
-    auto col_bid_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
-    auto col_ask_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
-    auto col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    // Persistent columns that survive across calls
+    static auto col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
+    static auto col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    static auto col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
+    static auto col_bid_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    static auto col_bid_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    static auto col_ask_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    static auto col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    static int buffered_snapshots = 0;
+
+    static constexpr int FLUSH_EVERY = 100; // flush every 100 snapshots (~100s of data)
 
     for (const auto& [stock_id, book] : books) {
         if (!book.IsInitialised()) continue;
 
         const auto snap = book.GetSnapshot(top_n);
-
         col_stock_id->Append(stock_id);
         col_stock_name->Append(std::string_view(book.GetName()));
         col_timestamp->Append(timestamp_ns);
@@ -90,6 +94,9 @@ static void snapshot_all_books(
         col_ask_shares->Append(snap.ask_shares);
     }
 
+    buffered_snapshots++;
+
+    if (!force_flush && buffered_snapshots < FLUSH_EVERY) return;
     if (col_stock_id->Size() == 0) return;
 
     clickhouse::Block block;
@@ -102,10 +109,21 @@ static void snapshot_all_books(
     block.AppendColumn("ask_shares",   col_ask_shares);
 
     client.Insert(full_table, block);
+    std::cout << "Flushed " << buffered_snapshots << " snapshots, rows: " << col_stock_id->Size() << "\n";
+
+    // Reset columns
+    col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
+    col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
+    col_bid_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    col_bid_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    col_ask_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
+    buffered_snapshots = 0;
 
     std::chrono::nanoseconds duration(timestamp_ns);
     std::chrono::hh_mm_ss real_time{duration};
-    std::cout << real_time << ": " << snapshots++ << "\n";
+    std::cout << real_time << ": snapshot #" << snapshots++ << "\n";
 }
 
 static inline void parse_message(uint8_t* ptr){
@@ -316,7 +334,7 @@ int main(int argc, char* argv[]){
         }
 
         //final snapshot
-        snapshot_all_books(client, full_table, ts, stock_books, TOP_N);
+        snapshot_all_books(client, full_table, ts, stock_books, TOP_N, true);
 
     } // client destroyed here — sends proper TCP disconnect before munmap/return
 
