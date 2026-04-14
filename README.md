@@ -4,17 +4,25 @@
 - Testing done with 30/01/2019 data from [NASDAQ](https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH) with message format following the [NASDAQ TotalView-ITCH 5.0](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/NQTVITCHspecification.pdf)
   - Data is listed as 1/31/2019, 1:18 AM
 
-### Goals
+### MVP Targets
 
 1. [x] Read and Decode Data
-2. [ ] Consume Decoded ITCH Messages
-   1. [ ] Order Book: 1.3.X and 1.4.X (WIP)
-   2. [ ] Stock Info: 1.2.X
-   3. [ ] Other...  : 1.5+
-3. [ ] Control Speed, have "real time", 2x, 3x.
-4. [ ] GUI(?) of order book, with price, depth and volume graphs
-or
-5. [ ] Dummy Server-Client server setup to mimic receiving from NASDAQ.
+2. [x] Consume Order Book ITCH Messages (1.3.X & 1.4.X)
+3. [x] Store Messages in DB
+   1. [x] Setup Clickhouse locally
+   2. [x] Save snapshots of order books in DB
+4. [ ] Create Local Frontend
+   1. [ ] Chose front-end
+   2. [ ] 
+
+### Could haves
+1. [ ] Consume Other ITCH Messages
+   1. [ ] Stock Info: 1.2.X
+   2. [ ] Other...  : 1.5+ (For volume data)
+2. [ ] Tickers for stocks.
+   1. [ ] Different time periods. (1m, 5m, 10m)
+   2. [ ] OCHL
+3. [ ] Multiple Files (Different days);
 
 ### What is ITCH
 
