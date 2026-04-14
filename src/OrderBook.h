@@ -34,9 +34,18 @@ class Order_Book {
 private:
     std::string stock_name; // Need, Stock Locate used for stock finding, more consistent.
     Trading_State state;
-    std::map<std::uint32_t,  std::uint32_t> bids;//  price, num of shares
-    std::map<std::uint32_t,  std::uint32_t> asks;//  price, num of shares
-    std::unordered_map<std::uint64_t, Order> orders; // order reference, order details.
+    std::map<std::uint32_t, std::uint32_t> bids;   // price → total shares (buy side)
+    std::map<std::uint32_t, std::uint32_t> asks;   // price → total shares (sell side)
+    std::unordered_map<std::uint64_t, Order> orders; // order reference → order details
+
+    // Per-price-level changes since the last delta flush.
+    // Value = new total shares at that level; 0 means the level was removed.
+    std::map<std::uint32_t, std::uint32_t> bid_deltas;
+    std::map<std::uint32_t, std::uint32_t> ask_deltas;
+
+    // Record the post-mutation state of a price level into the appropriate delta map.
+    void record_delta(char side_indicator, std::uint32_t price);
+
 public:
     Order_Book() {};
     Order_Book(std::string_view stock);
@@ -45,6 +54,11 @@ public:
     bool IsInitialised() const { return !stock_name.empty(); }
     Trading_State Get_State(){ return state; }
     void Set_State(char new_state);
+    // Delta access
+    bool HasDeltas() const { return !bid_deltas.empty() || !ask_deltas.empty(); }
+    const std::map<std::uint32_t, std::uint32_t>& GetBidDeltas() const { return bid_deltas; }
+    const std::map<std::uint32_t, std::uint32_t>& GetAskDeltas() const { return ask_deltas; }
+    void ClearDeltas() { bid_deltas.clear(); ask_deltas.clear(); }
     // Snapshot
     BookSnapshot GetSnapshot(size_t top_n) const;
 

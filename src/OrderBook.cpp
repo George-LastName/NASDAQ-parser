@@ -11,29 +11,27 @@ Order_Book::Order_Book(std::string_view stock){
     stock_name = stock;
 }
 
+// Capture the post-mutation total at a price level into the delta map.
+// If the level no longer exists in the book, records 0 (level removed).
+void Order_Book::record_delta(char side_indicator, std::uint32_t price) {
+    const auto& side = (side_indicator == 'B') ? bids : asks;
+    auto&     deltas = (side_indicator == 'B') ? bid_deltas : ask_deltas;
+    const auto it = side.find(price);
+    deltas[price] = (it != side.end()) ? it->second : 0;
+}
+
 void Order_Book::Set_State(char new_state){
     switch (new_state){
-        case 'H': {
-            state = Trading_State::Halt;
-            break;
-        }
-        case 'P': {
-            state = Trading_State::Paused;
-            break;
-        }
-        case 'Q': {
-            state = Trading_State::Quotation;
-            break;
-        }
-        case 'T': {
-            state = Trading_State::Trading;
-            break;
-        }
+        case 'H': { state = Trading_State::Halt;      break; }
+        case 'P': { state = Trading_State::Paused;    break; }
+        case 'Q': { state = Trading_State::Quotation; break; }
+        case 'T': { state = Trading_State::Trading;   break; }
         default:{
             std::cout << "Unknown Trading State for " << stock_name << " of " << new_state << "\n";
             exit(0);
         }
     }
+    // State changes don't affect price levels — no delta recorded.
 }
 
 template<typename T>
@@ -56,6 +54,7 @@ void Order_Book::Add(const T* order){
 
     auto& side = (new_order.indicator == 'B') ? bids : asks;
     side[new_order.price] += new_order.shares;
+    record_delta(new_order.indicator, new_order.price);
 }
 
 template void Order_Book::Add(const Add_Order_MPID* order);
@@ -81,7 +80,6 @@ BookSnapshot Order_Book::GetSnapshot(size_t top_n) const {
     return snap;
 }
 
-
 void Order_Book::Execute(const Order_Executed* order){
     auto it = orders.find(order->order_reference_number);
     if(it == orders.end()){
@@ -102,6 +100,7 @@ void Order_Book::Execute(const Order_Executed* order){
     if(side[exec_order.price] == 0){
         side.erase(exec_order.price);
     }
+    record_delta(exec_order.indicator, exec_order.price);
 
     exec_order.shares -= executed_shares;
     if(exec_order.shares == 0){
@@ -129,6 +128,7 @@ void Order_Book::Execute(const Order_Executed_With_Price* order){
     if(side[exec_order.price] == 0){
         side.erase(exec_order.price);
     }
+    record_delta(exec_order.indicator, exec_order.price);
 
     exec_order.shares -= executed_shares;
     if(exec_order.shares == 0){
@@ -156,6 +156,7 @@ void Order_Book::Cancel(const Order_Cancel* order){
     if(side[cancel_order.price] == 0){
         side.erase(cancel_order.price);
     }
+    record_delta(cancel_order.indicator, cancel_order.price);
 
     cancel_order.shares -= canceled_shares;
     if(cancel_order.shares == 0){
@@ -177,6 +178,7 @@ void Order_Book::Delete(const Order_Delete* order){
     if(side[delete_order.price] == 0){
         side.erase(delete_order.price);
     }
+    record_delta(delete_order.indicator, delete_order.price);
 
     orders.erase(it);
 }
@@ -195,6 +197,7 @@ void Order_Book::Replace(const Order_Replace* order){
     if(side[old_order.price] == 0){
         side.erase(old_order.price);
     }
+    record_delta(old_order.indicator, old_order.price);
 
     Order new_order;
     new_order.indicator = old_order.indicator;
@@ -206,6 +209,5 @@ void Order_Book::Replace(const Order_Replace* order){
     orders.insert({order->new_order_reference_number, new_order});
 
     side[new_order.price] += new_order.shares;
+    record_delta(new_order.indicator, new_order.price);
 }
-
-

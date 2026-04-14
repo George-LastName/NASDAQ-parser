@@ -35,8 +35,6 @@ enum class Market_State {
 };
 
 int counts[256] = {0};
-int snapshots = 0;
-std::unordered_map<std::string, std::array<int, 256>> stock_messages;
 std::unordered_map<uint16_t, Order_Book> stock_books;
 
 static std::string sanitise_table_name(const std::string& path) {
@@ -61,15 +59,88 @@ static std::string sanitise_table_name(const std::string& path) {
 
 
 
+// Flush per-price-level deltas for every book that changed since the last call.
+// Each row: (timestamp_ns, stock_id, stock_name, side, price, shares).
+// shares == 0 means the price level was removed from the book.
+// Deltas within a 1-second window collapse to their final state — only the net
+// result at each price level is written, never intermediate states.
+static void flush_deltas(
+    clickhouse::Client& client,
+    const std::string& delta_table,
+    uint64_t timestamp_ns,
+    std::unordered_map<uint16_t, Order_Book>& books,
+    bool force_flush = false)
+{
+    static auto col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
+    static auto col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
+    static auto col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    static auto col_side       = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    static auto col_price      = std::make_shared<clickhouse::ColumnUInt32>();
+    static auto col_shares     = std::make_shared<clickhouse::ColumnUInt32>();
+    static int buffered_rounds = 0;
+
+    static constexpr int FLUSH_EVERY = 100; // flush every 100 delta rounds (~100s of data)
+
+    for (auto& [stock_id, book] : books) {
+        if (!book.IsInitialised() || !book.HasDeltas()) continue;
+
+        const std::string_view name = book.GetName();
+
+        for (const auto& [price, shares] : book.GetBidDeltas()) {
+            col_timestamp->Append(timestamp_ns);
+            col_stock_id->Append(stock_id);
+            col_stock_name->Append(name);
+            col_side->Append(std::string_view("B", 1));
+            col_price->Append(price);
+            col_shares->Append(shares);
+        }
+        for (const auto& [price, shares] : book.GetAskDeltas()) {
+            col_timestamp->Append(timestamp_ns);
+            col_stock_id->Append(stock_id);
+            col_stock_name->Append(name);
+            col_side->Append(std::string_view("S", 1));
+            col_price->Append(price);
+            col_shares->Append(shares);
+        }
+
+        book.ClearDeltas();
+    }
+
+    buffered_rounds++;
+    if (!force_flush && buffered_rounds < FLUSH_EVERY) return;
+    if (col_timestamp->Size() == 0) return;
+
+    clickhouse::Block block;
+    block.AppendColumn("timestamp_ns", col_timestamp);
+    block.AppendColumn("stock_id",     col_stock_id);
+    block.AppendColumn("stock_name",   col_stock_name);
+    block.AppendColumn("side",         col_side);
+    block.AppendColumn("price",        col_price);
+    block.AppendColumn("shares",       col_shares);
+
+    client.Insert(delta_table, block);
+    //std::cout << "Flushed " << buffered_rounds << " delta rounds, rows: " << col_timestamp->Size() << "\n";
+
+    col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
+    col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
+    col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    col_side       = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
+    col_price      = std::make_shared<clickhouse::ColumnUInt32>();
+    col_shares     = std::make_shared<clickhouse::ColumnUInt32>();
+    buffered_rounds = 0;
+}
+
+// Write a full top-N snapshot of every initialised book.
+// Runs at a lower frequency (every 60 s) to provide a recovery baseline so
+// consumers do not need to replay the entire delta stream from midnight.
 static void snapshot_all_books(
     clickhouse::Client& client,
-    const std::string& full_table,
+    const std::string& snapshot_table,
     uint64_t timestamp_ns,
     const std::unordered_map<uint16_t, Order_Book>& books,
     size_t top_n,
     bool force_flush = false)
 {
-    // Persistent columns that survive across calls
     static auto col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
     static auto col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
     static auto col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
@@ -79,7 +150,7 @@ static void snapshot_all_books(
     static auto col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
     static int buffered_snapshots = 0;
 
-    static constexpr int FLUSH_EVERY = 100; // flush every 100 snapshots (~100s of data)
+    static constexpr int FLUSH_EVERY = 10; // flush every 10 snapshots (~10 min of data)
 
     for (const auto& [stock_id, book] : books) {
         if (!book.IsInitialised()) continue;
@@ -95,7 +166,6 @@ static void snapshot_all_books(
     }
 
     buffered_snapshots++;
-
     if (!force_flush && buffered_snapshots < FLUSH_EVERY) return;
     if (col_stock_id->Size() == 0) return;
 
@@ -108,10 +178,11 @@ static void snapshot_all_books(
     block.AppendColumn("ask_prices",   col_ask_prices);
     block.AppendColumn("ask_shares",   col_ask_shares);
 
-    client.Insert(full_table, block);
-    std::cout << "Flushed " << buffered_snapshots << " snapshots, rows: " << col_stock_id->Size() << "\n";
+    client.Insert(snapshot_table, block);
+    std::chrono::nanoseconds duration(timestamp_ns);
+    std::chrono::hh_mm_ss real_time{duration};
+    std::cout << real_time <<  ": Flushed " << buffered_snapshots << " snapshots, rows: " << col_stock_id->Size() << "\n";
 
-    // Reset columns
     col_stock_id   = std::make_shared<clickhouse::ColumnUInt16>();
     col_stock_name = std::make_shared<clickhouse::ColumnLowCardinalityT<clickhouse::ColumnString>>();
     col_timestamp  = std::make_shared<clickhouse::ColumnUInt64>();
@@ -120,10 +191,6 @@ static void snapshot_all_books(
     col_ask_prices = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
     col_ask_shares = std::make_shared<clickhouse::ColumnArrayT<clickhouse::ColumnUInt32>>();
     buffered_snapshots = 0;
-
-    std::chrono::nanoseconds duration(timestamp_ns);
-    std::chrono::hh_mm_ss real_time{duration};
-    std::cout << real_time << ": snapshot #" << snapshots++ << "\n";
 }
 
 static inline void parse_message(uint8_t* ptr){
@@ -294,25 +361,53 @@ int main(int argc, char* argv[]){
         client.Execute(
             "CREATE DATABASE IF NOT EXISTS " + database_name
         );
+
+        // Full book snapshots — taken every 60 s as a recovery baseline.
+        // ReplacingMergeTree deduplicates on (stock_id, timestamp_ns) so re-runs
+        // of the same file are idempotent.
         client.Execute(R"(
-            CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(
+            CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(_snapshots
                 (
                     stock_id        UInt16,
-                 stock_name      LowCardinality(String),
-                 timestamp_ns    UInt64,
-                 bid_prices      Array(UInt32),
-                 bid_shares      Array(UInt32),
-                 ask_prices      Array(UInt32),
-                 ask_shares      Array(UInt32)
+                    stock_name      LowCardinality(String),
+                    timestamp_ns    UInt64,
+                    bid_prices      Array(UInt32),
+                    bid_shares      Array(UInt32),
+                    ask_prices      Array(UInt32),
+                    ask_shares      Array(UInt32)
                 )
                 ENGINE = ReplacingMergeTree()
                 ORDER BY (stock_id, timestamp_ns)
                 SETTINGS index_granularity = 8192
         )");
 
+        // Per-price-level deltas — one row per changed level per second.
+        // shares = 0 means the level was removed.
+        // MergeTree (no dedup) because each delta is a distinct event.
+        client.Execute(R"(
+            CREATE TABLE IF NOT EXISTS )" + database_name + "." + table_name + R"(_deltas
+                (
+                    timestamp_ns    UInt64,
+                    stock_id        UInt16,
+                    stock_name      LowCardinality(String),
+                    side            LowCardinality(String),
+                    price           UInt32,
+                    shares          UInt32
+                )
+                ENGINE = MergeTree()
+                ORDER BY (stock_id, timestamp_ns, side, price)
+                SETTINGS index_granularity = 8192
+        )");
+
         std::uint8_t* filePtr = mapped_file;
         const std::uint8_t* file_end = mapped_file + file_size;
-        const std::string full_table = database_name + "." + table_name;
+        const std::string snapshot_table = database_name + "." + table_name + "_snapshots";
+        const std::string delta_table    = database_name + "." + table_name + "_deltas";
+
+        static constexpr uint64_t DELTA_INTERVAL_NS    =  1'000'000'000ULL; //  1 second
+        static constexpr uint64_t SNAPSHOT_INTERVAL_NS = 60'000'000'000ULL; // 60 seconds
+
+        uint64_t last_delta_ns    = 0;
         uint64_t last_snapshot_ns = 0;
         uint64_t ts = 0;
 
@@ -325,16 +420,24 @@ int main(int argc, char* argv[]){
 
             parse_message(filePtr);
 
-            if (ts - last_snapshot_ns >= 1'000'000'000ULL) {
-                snapshot_all_books(client, full_table, ts, stock_books, TOP_N);
+            // Flush changed price levels every second
+            if (ts - last_delta_ns >= DELTA_INTERVAL_NS) {
+                flush_deltas(client, delta_table, ts, stock_books);
+                last_delta_ns = ts;
+            }
+
+            // Write full book snapshots every 60 seconds as a recovery baseline
+            if (ts - last_snapshot_ns >= SNAPSHOT_INTERVAL_NS) {
+                snapshot_all_books(client, snapshot_table, ts, stock_books, TOP_N);
                 last_snapshot_ns = ts;
             }
 
             filePtr += message_l;
         }
 
-        //final snapshot
-        snapshot_all_books(client, full_table, ts, stock_books, TOP_N, true);
+        // Final flush of any remaining buffered data
+        flush_deltas(client, delta_table, ts, stock_books, true);
+        snapshot_all_books(client, snapshot_table, ts, stock_books, TOP_N, true);
 
     } // client destroyed here — sends proper TCP disconnect before munmap/return
 
