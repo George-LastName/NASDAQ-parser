@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.3.1)
 
 project (ITCH_Viewer
-         VERSION 0.1
+         VERSION 0.2.0
          )
 
 set(CMAKE_CXX_STANDARD 23)
