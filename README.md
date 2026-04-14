@@ -12,10 +12,13 @@
    1. [x] Setup Clickhouse locally
    2. [x] Save snapshots of order books in DB
 4. [ ] Create Local Frontend
-   1. [ ] Chose front-end
+   1. [ ] Choose front-end
    2. [ ] Implement Simple Version to sanity check DB
    3. [ ] Order Book visualisation for each stock.
-5. [ ] Cloud or Self-Host website to show fron-end.
+5. [ ] Cloud or Self-Host website to show front-end.
+   1. [ ] Cloud vs Self-Host.
+   2. [ ] Store DB.
+   3. [ ] Connect Front-end.
 
 ### Could haves
 1. [ ] Consume Other ITCH Messages
