@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/OrderBook.cpp
+    src/clickhouse/ClickhouseOrderBook.cpp
     )
 
 add_subdirectory(contribs/clickhouse-cpp)
@@ -23,7 +24,7 @@ target_compile_options(${PROJECT_NAME}
     )
 
 target_include_directories(${PROJECT_NAME}
-    PRIVATE
+    SYSTEM PRIVATE
     contribs/clickhouse-cpp
     contribs/clickhouse-cpp/contrib/absl
     )
