@@ -13,7 +13,9 @@
    2. [x] Save snapshots of order books in DB
 4. [ ] Create Local Frontend
    1. [ ] Chose front-end
-   2. [ ] 
+   2. [ ] Implement Simple Version to sanity check DB
+   3. [ ] Order Book visualisation for each stock.
+5. [ ] Cloud or Self-Host website to show fron-end.
 
 ### Could haves
 1. [ ] Consume Other ITCH Messages
@@ -23,6 +25,9 @@
    1. [ ] Different time periods. (1m, 5m, 10m)
    2. [ ] OCHL
 3. [ ] Multiple Files (Different days);
+4. [ ] Paralise
+   1. [ ] Move Clickhouse Logging to own thread.
+   2. [ ] Allow for processing of multiple files at once.
 
 ### What is ITCH
 
