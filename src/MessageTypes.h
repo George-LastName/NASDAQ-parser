@@ -1,5 +1,4 @@
-#ifndef MESSAGE_TYPES_H
-#define MESSAGE_TYPES_H
+#pragma once
 #include <cstdint> // uintX_t
 #include <chrono> // chrono:: for nanoseconds from midnight
 #include <cstring> // memcpy
@@ -276,5 +275,3 @@ struct [[gnu::packed]] DLCR_Price_Discovery {
     std::uint32_t lower_price_range_collar;
     std::uint32_t upper_price_range_collar;
 };
-
-#endif //MESSAGE_TYPES_H

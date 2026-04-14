@@ -1,5 +1,4 @@
-#ifndef ORDER_BOOK_H
-#define ORDER_BOOK_H
+#pragma once
 #include <string>
 #include <cstdint>
 #include <map>
@@ -77,5 +76,3 @@ public:
     //replace - U
     void Replace(const Order_Replace* order);
 };
-
-#endif //ORDER_BOOK_H
